@@ -30,12 +30,17 @@ def fetch_stock_data(ticker: str) -> str:
         return report
     except Exception as e:
         return f"Error fetching data for {ticker}: {str(e)}"
-
-
-
-web_search_tool = TavilySearch(max_results=3)
-web_search_tool.name = "Web Search Tool"
-web_search_tool.description = "A powerful search engine optimized for comprehensive, accurate, and trusted results. Useful for finding recent news, market sentiment, or general internet searches. Input should be a specific search query."
-
+@tool("Web Search Tool")
+def web_search_tool(query: str) -> str:
+    """
+    A powerful search engine optimized for comprehensive, accurate, and trusted results. 
+    Useful for finding recent news, market sentiment, or general internet searches. 
+    Input should be a specific search query.
+    """
+    try:
+        results = tavily_engine.invoke({"query": query})
+        return str(results)
+    except Exception as e:
+         return f"Error performing web search: {str(e)}"
 if __name__ == "__main__":
-    print(web_search_tool.invoke({"query": "Latest news about Apple stock"}))
+    print(web_search_tool.run(query="Latest news about Apple stock"))
