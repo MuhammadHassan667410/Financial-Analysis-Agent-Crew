@@ -56,7 +56,11 @@ export default function Home() {
               if (data.startsWith('[REPORT_READY]')) {
                 // Done! Extract the report (replace <br> back to \n and format it safely)
                 const rawReport = data.replace('[REPORT_READY] ', '');
-                const cleanReport = rawReport.replace(/<br>/g, '\n');
+                const cleanReport = rawReport
+                  .replace(/<br>/g, '\n')
+                  .replace(/^```(?:markdown|md)?\s*\n?/i, '')
+                  .replace(/\n?```\s*$/i, '')
+                  .trim();
                 setFinalReport(cleanReport);
                 setIsAnalyzing(false);
               } else {
