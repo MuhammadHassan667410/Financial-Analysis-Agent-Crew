@@ -1,0 +1,9 @@
+crewai
+fastapi
+uvicorn
+pydantic
+python-dotenv
+yfinance
+pandas
+langchain-tavily
+crewai[azure-ai-inference]

@@ -1,7 +1,12 @@
 import os
 from dotenv import load_dotenv
 from crewai import Agent, LLM
-from tools import fetch_stock_data, web_search_tool
+from tools import (
+    fetch_stock_data,
+    fetch_valuation_metrics,
+    fetch_competitive_context,
+    web_search_tool,
+)
 from crewai import Task, Crew
 
 load_dotenv(override=True)
@@ -15,10 +20,10 @@ azure_llm = LLM(
 print(f"✅ Successfully initialized LLM: {os.getenv('AZURE_OPENAI_DEPLOYMENT_NAME')}")
 researcher = Agent(
     role="Senior Market Researcher",
-    goal="Gather the most recent and impactful news regarding the stock {ticker}.",
+    goal="Gather the most recent and impactful market developments regarding {ticker}, with verifiable sources and clear risk implications.",
     backstory="""You are a veteran Wall Street researcher. 
     Your expertise lies in finding the most relevant news articles, press releases, and market sentiment 
-    that could affect a company's stock price.""",
+    that could affect a company's stock price. You always provide source links and publication dates.""",
     verbose=True, 
     allow_delegation=False, 
     tools=[web_search_tool],
@@ -27,22 +32,23 @@ researcher = Agent(
 
 data_analyst = Agent(
     role="Quantitative Data Analyst",
-    goal="Analyze the historical price data for {ticker} and summarize its recent performance.",
+    goal="Deliver evidence-backed analysis for {ticker} covering performance, valuation, technicals, and peer-relative context.",
     backstory="""You are a brilliant quantitative analyst. 
     You excel at looking at raw stock prices, calculating returns, and explaining 
-    price movements in a clear, concise manner.""",
+    price movements in a clear, concise manner. You support every conclusion with specific numbers and comparisons.""",
     verbose=True,
     allow_delegation=False,
-    tools=[fetch_stock_data],
+    tools=[fetch_stock_data, fetch_valuation_metrics, fetch_competitive_context],
     llm=azure_llm
 )
 
 report_writer = Agent(
     role="Financial Report Writer",
-    goal="Synthesize the news research and the data analysis into a professional, easy-to-read executive summary for {ticker}.",
+    goal="Synthesize research and analysis into an institutional-quality stock report for {ticker}, with complete sections and clear sourcing.",
     backstory="""You are a renowned financial journalist and report writer. 
     You take complex research and data and weave it into a cohesive, highly professional executive summary 
-    that investors can easily understand. You do not make up data; you strictly use what the researchers and analysts provide.""",
+    that investors can easily understand. You do not make up data; you strictly use what the researchers and analysts provide.
+    If any required section lacks data, you explicitly write 'Data Not Available' instead of fabricating.""",
     verbose=True,
     allow_delegation=False,
     tools=[],
@@ -51,25 +57,62 @@ report_writer = Agent(
 print("✅ Agents successfully defined!")
 
 research_task = Task(
-    description="""Search the internet for the most recent and impactful news regarding the stock {ticker}.
-    Focus on earnings reports, product launches, macroeconomic factors, or analyst ratings.
-    Compile a summary of at least 3 major news points.""",
-    expected_output="A bulleted summary of the 3 most important recent news items regarding {ticker}.",
+    description="""Search for the most recent and impactful developments regarding {ticker}.
+    You MUST include at least 5 high-signal items across:
+    1) earnings/financial results,
+    2) AI/product roadmap updates,
+    3) analyst target/recommendation changes,
+    4) regulatory or legal developments,
+    5) macro or FX impacts.
+
+    For each item include:
+    - concise summary,
+    - bull/bear interpretation,
+    - a source URL and publication date.
+
+    Also provide an explicit risk list that names and briefly explains key risks (e.g., China exposure, antitrust pressure, AI monetization delays, FX headwinds).""",
+    expected_output="A structured research brief with at least 5 market news items, explicit risk bullets, and source citations (URL + date) for each item.",
     agent=researcher
 )
 
 data_analysis_task = Task(
-    description="""Use the fetch_stock_data tool to pull the last 6 months of price history for {ticker}.
-    Analyze the percentage return, the recent price volatility, and the overall trend.""",
-    expected_output="A statistical summary including the 6-month return, current price, and a brief analysis of the trend.",
+    description="""Use all quantitative tools for {ticker}:
+    - fetch_stock_data
+    - fetch_valuation_metrics
+    - fetch_competitive_context
+
+    Produce a structured analytical package that includes:
+    1) Performance: 6-month return and recent volatility behavior.
+    2) Technical analysis evidence: key support/resistance, 50-day and 200-day moving averages (if available), RSI(14), and volume trend interpretation.
+    3) Valuation analysis: trailing P/E, forward P/E, PEG, and whether valuation appears cheap/fair/expensive versus peers and recent trend.
+    4) Competitive context: compare {ticker} performance to MSFT, GOOGL, NVDA, and SPY over 6M/1Y where available.
+
+    Every claim must reference the numeric evidence from tool outputs.""",
+    expected_output="A detailed quantitative brief with valuation, technical indicators, and peer/S&P benchmarking supported by explicit numbers.",
     agent=data_analyst
 )
 
 writing_task = Task(
-    description="""Take the output from the Market Researcher and the Quantitative Data Analyst.
-    Combine them into a professional, cohesive executive summary for {ticker}.
-    The report should be structured with clear headings: 'Market News', 'Data Analysis', and 'Executive Conclusion'.""",
-    expected_output="A highly professional text report synthesizing all gathered research and data.",
+    description="""Create a final professional report for {ticker} by combining the research and quantitative briefs.
+
+    REQUIRED HEADINGS (all mandatory):
+    - Executive Summary
+    - Market News
+    - Data Analysis
+    - Valuation Analysis
+    - Technical Analysis
+    - Risk Assessment
+    - Competitive Context
+    - Executive Conclusion
+    - Sources
+
+    Quality requirements:
+    - Keep existing strengths from prior report (clear narrative + performance summary).
+    - Add missing institutional elements: valuation judgment (cheap/fair/expensive), explicit risk section, evidence-backed technical section, peer/S&P context, and source citations.
+    - Do not invent facts. If missing, state Data Not Available.
+    - In the Sources section, list every cited link with publication date and outlet.
+    - Write in concise, professional markdown suitable for investor review.""",
+    expected_output="A complete markdown investment report containing all required sections and source-backed analysis.",
     agent=report_writer
 )
 
