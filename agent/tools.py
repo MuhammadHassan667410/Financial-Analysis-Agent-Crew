@@ -30,6 +30,8 @@ def fetch_stock_data(ticker: str) -> str:
         return report
     except Exception as e:
         return f"Error fetching data for {ticker}: {str(e)}"
+tavily_engine = TavilySearch(max_results=3)
+
 @tool("Web Search Tool")
 def web_search_tool(query: str) -> str:
     """
